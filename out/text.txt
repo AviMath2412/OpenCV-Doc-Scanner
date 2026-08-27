@@ -1,0 +1,32 @@
+LLMs are often trained as causal language models, i.e. past tokens cannot attend to future tokens.
+Therefore. the order of the tokens in a user’s query can affect prediction performance. For example, a
+query of the form “<CONTEXT> <QUESTION>” often performs differently from a query of the form
+“<QUESTION> <COKTEXT>” (see options-first vs. question-first in Figure 1). We propose to repeat
+the prompt, i.e. transform the input from ‘ <QUERY> ” to “ <QUERY><QUERY> ". This enables each
+prompt token to attend to every other prompt token, addressing the above. When not using reasoning,
+prompt repetition improves the performance of LLMs (Figure 1) without increasing the lengths
+of the generated outputs or latency (Figures 2 and 3).
+
+ee ‘ Sree zeA quentiont ot eek Met oowax
+g4 fg? he Wa Prost Resetition
+HMA fr optrome wet MMLL Pro quedtina rat Sartelenes ZF of 8 Wugilewtarss 10 4 3 BAH
+j i i
+y
+% 4 a4%
+Fi g gi 7
+Z Z
+Z
+47
+ad A
+%g 4
+Z ;
+4. 2
+eso <
+§ or é
+. Pe £
+é & fas g
+
+Figure 1: Prompt repettion vs. baseline accuracy for popular LLMs and various benchmarks when
+asking the models not to reason. A star indicates a statistically significa < 0.1 according
+to the McNemar test McNeinar [1947]). Prompt repetition wins 47 out of 70 test 's, With 0 losses.
+
