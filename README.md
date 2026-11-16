@@ -160,23 +160,5 @@ python main.py --input photo.jpg --output out/ --lang eng+hin
 
 ---
 
-## 🎓 Viva Questions & Answers (Exam / Presentation Prep)
-
-> **Q1: Why do you downscale the image during edge detection?**  
-> *A:* Downscaling (to height 700px) significantly speeds up Canny gradient computation and contours processing. It also acts as an implicit low-pass filter, smoothing away paper fiber micro-textures that would otherwise generate spurious edge noise. Once corners are located, they are scaled back to the original resolution by multiplying by `ratio`.
-
-> **Q2: How does the 4-point perspective transform mathematically work?**  
-> *A:* Perspective projection is modeled by a $3 \times 3$ Homography matrix $M$ with 8 degrees of freedom:  
-> $\begin{bmatrix} x' \\ y' \\ 1 \end{bmatrix} \sim M \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}$  
-> Given 4 non-collinear point correspondences $(x_i, y_i) \leftrightarrow (x'_i, y'_i)$, OpenCV solves the linear system using `cv2.getPerspectiveTransform()` and maps the quad into a flat rectangular raster with `cv2.warpPerspective()`.
-
-> **Q3: How does your illumination correction eliminate shadows without a blank reference sheet?**  
-> *A:* It uses a Gaussian blur background model with a large spatial variance ($\sigma = 25$). High-frequency text details are blurred away, leaving only the low-frequency ambient lighting and shadow field $B(x, y)$. Dividing the input image $I(x, y)$ by $B(x, y)$ normalizes the paper reflectance across the entire document.
-
-> **Q4: What is the difference between a simple scanned image + text file and a Searchable PDF?**  
-> *A:* A searchable PDF embeds an invisible, pixel-aligned text layer directly beneath the document image (`pytesseract.image_to_pdf_or_hocr`). This allows users to search, highlight, and copy text directly in any PDF reader while preserving the authentic visual appearance of the scanned document.
-
----
-
 ## 📄 License
 MIT License. Created for Computer Vision & Document Intelligence coursework and research demonstrations.
