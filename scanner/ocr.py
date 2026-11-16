@@ -8,10 +8,27 @@ Runs Tesseract OCR on the enhanced page and produces:
      perfectly aligned under the scanned image.
 """
 
-import pytesseract
+try:
+    import pytesseract
+    HAS_PYTESSERACT = True
+except ImportError:
+    pytesseract = None
+    HAS_PYTESSERACT = False
+
 import cv2
 import numpy as np
 from PIL import Image
+
+
+def _check_pytesseract():
+    if not HAS_PYTESSERACT:
+        raise ImportError(
+            "The 'pytesseract' package is not installed in the currently active Python environment.\n"
+            "To fix this, either:\n"
+            "  1. Run with your Conda environment: /opt/homebrew/Caskroom/miniconda/base/bin/python3 gui.py\n"
+            "  2. Or activate Conda: conda activate base && python gui.py\n"
+            "  3. Or install pytesseract in this Python: pip install pytesseract"
+        )
 
 
 def _to_pil(image: np.ndarray) -> Image.Image:
@@ -23,6 +40,8 @@ def _to_pil(image: np.ndarray) -> Image.Image:
 
 def extract_text(image: np.ndarray, lang: str = "eng") -> str:
     """Runs OCR and returns plain text."""
+    if not HAS_PYTESSERACT:
+        return "(OCR unavailable: 'pytesseract' is not installed in this Python environment.)"
     return pytesseract.image_to_string(image, lang=lang)
 
 
@@ -31,11 +50,20 @@ def extract_text_with_confidence(image: np.ndarray, lang: str = "eng"):
     Returns (text, mean_confidence) so the app can flag low-quality scans
     to the user (e.g. 'text unclear, try rescanning').
     """
-    data = pytesseract.image_to_data(image, lang=lang, output_type=pytesseract.Output.DICT)
-    confidences = [int(c) for c in data["conf"] if c not in ("-1", -1)]
-    mean_conf = sum(confidences) / len(confidences) if confidences else 0.0
-    text = pytesseract.image_to_string(image, lang=lang)
-    return text, mean_conf
+    if not HAS_PYTESSERACT:
+        return (
+            "(OCR unavailable: pytesseract is not installed in this Python.\n"
+            "Run 'conda activate base' or 'pip install pytesseract'.)",
+            0.0
+        )
+    try:
+        data = pytesseract.image_to_data(image, lang=lang, output_type=pytesseract.Output.DICT)
+        confidences = [int(c) for c in data["conf"] if c not in ("-1", -1)]
+        mean_conf = sum(confidences) / len(confidences) if confidences else 0.0
+        text = pytesseract.image_to_string(image, lang=lang)
+        return text, mean_conf
+    except Exception as e:
+        return f"(OCR error: {e})", 0.0
 
 
 def image_to_searchable_pdf(image: np.ndarray, output_path: str, lang: str = "eng"):
@@ -44,6 +72,7 @@ def image_to_searchable_pdf(image: np.ndarray, output_path: str, lang: str = "en
     invisible OCR text layer is pixel-aligned to the image -- this is
     more robust than manually overlaying text with reportlab.
     """
+    _check_pytesseract()
     pil_image = _to_pil(image)
     pdf_bytes = pytesseract.image_to_pdf_or_hocr(
         pil_image, lang=lang, extension="pdf"
@@ -59,6 +88,7 @@ def images_to_searchable_pdf(images: list, output_path: str, lang: str = "eng"):
     searchable PDF. Uses pypdf if available, else falls back to writing the
     first page's Tesseract PDF only (kept simple & dependency-light).
     """
+    _check_pytesseract()
     page_pdfs = []
     for img in images:
         page_pdfs.append(pytesseract.image_to_pdf_or_hocr(

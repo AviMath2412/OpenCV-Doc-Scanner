@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 
-def four_point_transform(image: np.ndarray, corners: np.ndarray) -> np.ndarray:
+def four_point_transform(image: np.ndarray, corners: np.ndarray, trim_edges: bool = True) -> np.ndarray:
     """
     corners: 4x2 array ordered [top-left, top-right, bottom-right, bottom-left].
     Computes the target rectangle size from the actual side lengths of the
@@ -37,25 +37,27 @@ def four_point_transform(image: np.ndarray, corners: np.ndarray) -> np.ndarray:
     M = cv2.getPerspectiveTransform(corners, dst)
     warped = cv2.warpPerspective(image, M, (max_width, max_height))
 
-    # Trim a thin sliver off each edge: the very border pixels often pick up
-    # a faint line from the background just outside the detected corners.
-    trim = max(2, int(0.01 * min(max_width, max_height)))
-    warped = warped[trim:-trim, trim:-trim]
+    if trim_edges and max_width > 20 and max_height > 20:
+        # Trim a thin sliver off each edge: border pixels often pick up
+        # a faint line from the background just outside the detected corners.
+        trim = max(2, int(0.008 * min(max_width, max_height)))
+        warped = warped[trim:-trim, trim:-trim]
     return warped
 
 
-def fine_deskew(gray: np.ndarray) -> np.ndarray:
+def fine_deskew(image: np.ndarray) -> np.ndarray:
     """
     Corrects small residual rotation (a couple of degrees) left after the
-    perspective warp, using the minAreaRect of all "ink" pixels.
-    Operates on and returns a single-channel (grayscale) image.
+    perspective warp, using the minAreaRect of all 'ink' pixels.
+    Supports both 2D (grayscale) and 3D (color) images.
     """
+    gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     inverted = cv2.bitwise_not(gray)
     thresh = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
     coords = np.column_stack(np.where(thresh > 0))
     if coords.shape[0] < 20:
-        return gray  # not enough content to safely estimate an angle
+        return image  # not enough content to safely estimate an angle
 
     angle = cv2.minAreaRect(coords)[-1]
     if angle < -45:
@@ -65,11 +67,11 @@ def fine_deskew(gray: np.ndarray) -> np.ndarray:
 
     # Ignore near-zero corrections and wild outliers (bad estimate)
     if abs(angle) < 0.3 or abs(angle) > 15:
-        return gray
+        return image
 
-    (h, w) = gray.shape[:2]
+    (h, w) = image.shape[:2]
     center = (w // 2, h // 2)
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    rotated = cv2.warpAffine(gray, M, (w, h), flags=cv2.INTER_CUBIC,
+    rotated = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_CUBIC,
                               borderMode=cv2.BORDER_REPLICATE)
     return rotated

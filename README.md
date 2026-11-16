@@ -1,154 +1,182 @@
-# Document Scanner & OCR
+# OpenCV Document Scanner & OCR Engine
 
-A Python + OpenCV application that turns a phone photo of a page into a clean,
-de-skewed, searchable PDF — automatic page-boundary detection, perspective
-correction, illumination correction, and OCR via Tesseract.
+A production-quality Python + OpenCV + Tesseract desktop application and CLI that transforms phone photos and live webcam captures of documents into clean, perspective-rectified, shadow-free, and searchable PDFs.
 
-**SDG alignment:** SDG 4 (Quality Education — digitizing notes/handouts),
-SDG 9 (Industry, Innovation & Infrastructure — practical CV/OCR pipeline),
-SDG 12 (Responsible Consumption & Production — reducing paper use by going
-digital).
+**Academic alignment:**
+- **SDG 4:** Quality Education (instant digitization of study notes, handouts, research papers).
+- **SDG 9:** Industry, Innovation & Infrastructure (real-world computer vision & OCR pipeline).
+- **SDG 12:** Responsible Consumption & Production (paperless digital document workflows).
 
-## How it works (pipeline)
+---
+
+## 🌟 Key Features
+
+### 🖥️ Interactive Desktop GUI (`gui.py`)
+- **Interactive Quad Boundary Adjustment (CamScanner-style):**
+  - Automatic 4-corner document detection.
+  - Interactive canvas with 4 draggable corner handles (TL, TR, BR, BL) and box dragging.
+  - **Real-Time Precision Magnifying Loupe:** Floating 2.5x zoom lens while dragging corners for pixel-perfect alignment.
+  - 90° Clockwise/Counter-Clockwise rotation, full-frame fallback, and auto-detect reset.
+- **9-Stage Computer Vision Pipeline Inspector (Viva / Demo Mode):**
+  - Step-by-step visual inspection of every internal OpenCV stage.
+  - Academic explanation cards detailing the mathematical concepts (Sobel gradients, Homography $3 \times 3$ matrices, Gaussian background division, Otsu/Adaptive Gaussian binarization, and Tesseract LSTM OCR).
+- **Live Webcam / Camera Scanner:**
+  - Real-time video stream (`cv2.VideoCapture`).
+  - Live document boundary overlay rendered directly on the camera feed at 30 FPS.
+  - Single-click document capture (`📸 Capture Page`).
+- **Multi-Page & Batch Document Manager:**
+  - Sidebar thumbnail list for multi-page documents.
+  - Add, remove, and reorder pages (Up / Down).
+  - One-click batch scanning of all pages.
+  - Combine multiple pages into a single multi-page searchable PDF.
+- **Multiple Enhancement Modes & Real-Time Tuning:**
+  - Modes: `bw` (clean adaptive binarization), `gray` (smooth de-shadowed grayscale), `color` (shadow-free vivid color), `original` (rectified without filter).
+  - Real-time sliders for Contrast ($0.5\times - 2.5\times$), Brightness ($-50$ to $+50$), Sharpness ($0.0 - 3.0$), and fine deskew.
+- **Integrated OCR & Searchable Export:**
+  - Color-coded OCR confidence meter (Green $>75\%$, Amber $45-75\%$, Red $<45\%$).
+  - Live keyword search highlighting within extracted text.
+  - One-click "Copy Text", "Save .txt", "Export Searchable PDF", and "Export All Assets Bundle".
+
+### ⚡ CLI Tool (`main.py`)
+- Fast single-command processing for single pages and multi-page batches.
+
+---
+
+## 🔬 How the CV Pipeline Works
 
 ```
-Photo of page
+Photo / Webcam Feed
    │
    ▼
-1. Page-boundary detection   (edge_detect.py)
-   Grayscale -> blur -> Canny edges -> dilate -> find largest 4-point contour
+1. Page-Boundary Detection   (edge_detect.py)
+   Grayscale -> Gaussian Blur (5x5) -> Canny Edges (50, 150) -> Dilate (5x5)
+   -> cv2.findContours -> Douglas-Peucker Polygon Approximation (approxPolyDP)
    │
    ▼
-2. Perspective transform      (perspective.py)
-   Warps the quadrilateral into a flat top-down rectangle (removes tilt/skew)
+2. Perspective Homography    (perspective.py)
+   Orders corners [TL, TR, BR, BL], computes 3x3 homography matrix (getPerspectiveTransform),
+   and warps quad into a top-down orthogonal plane (warpPerspective)
    │
    ▼
-3. Illumination correction &  (enhance.py)
-   contrast enhancement
-   Divides out the shadow/lighting pattern (Gaussian-blur background model),
-   applies CLAHE contrast, sharpens, then adaptive-thresholds to a clean
-   black-and-white "scanned" look
+3. Illumination Correction   (enhance.py)
+   Low-pass Gaussian filter (sigma=25) models uneven ambient lighting/shadows;
+   divides original signal by background model: R(x, y) = 255 * (I / B)
    │
    ▼
-4. Fine deskew                (perspective.py: fine_deskew)
-   Corrects any small residual rotation left after the perspective warp
+4. Contrast & Sharpness      (enhance.py)
+   Applies CLAHE (Contrast Limited Adaptive Histogram Equalization) and unsharp masking
    │
    ▼
-5. OCR + export                (ocr.py)
-   Tesseract extracts text and also renders a searchable PDF (image +
-   invisible text layer, pixel-aligned)
+5. Binarization & Deskew     (enhance.py & perspective.py)
+   Adaptive Gaussian thresholding + fine orientation correction via minAreaRect
+   │
+   ▼
+6. Tesseract OCR & PDF       (ocr.py)
+   Extracts text with confidence scores and embeds an invisible pixel-aligned text layer
+   into a standard PDF via Tesseract's image_to_pdf_or_hocr renderer
 ```
 
-## Project structure
+---
+
+## 📁 Project Structure
 
 ```
-doc_scanner/
-├── main.py                # CLI entry point
-├── gui.py                 # Optional Tkinter desktop GUI (for demos)
-├── requirements.txt
+OpenCV-Doc-Scanner/
+├── gui.py                  # Full desktop application GUI
+├── main.py                 # CLI entry point
+├── photo.jpg               # Sample test document
+├── angled_sample.jpg       # Sample angled document photo for demos
+├── requirements.txt        # Python package dependencies
 ├── scanner/
 │   ├── __init__.py
-│   ├── edge_detect.py      # page boundary / contour detection
-│   ├── perspective.py      # 4-point warp + fine deskew
-│   ├── enhance.py          # illumination correction, CLAHE, B/W conversion
-│   ├── ocr.py              # Tesseract OCR + searchable PDF export
-│   └── pipeline.py         # orchestrates the full flow, used by both CLI & GUI
+│   ├── edge_detect.py      # Page contour detection & 4-corner ordering
+│   ├── perspective.py      # Homography warp & fine deskew
+│   ├── enhance.py          # Shadow division, CLAHE, sharpening, binarization
+│   ├── ocr.py              # Tesseract OCR & searchable PDF export
+│   └── pipeline.py         # Full orchestrator & 9-stage CV visualizer
+└── out/                    # Default output folder for scans
 ```
 
-## Setup
+---
 
-1. Install Tesseract OCR itself (the Python package only wraps it):
-   - **Ubuntu/Debian:** `sudo apt install tesseract-ocr`
-   - **Windows:** install from https://github.com/UB-Mannheim/tesseract/wiki, then
-     add the install folder to PATH (or set `pytesseract.pytesseract.tesseract_cmd`
-     at the top of `scanner/ocr.py` to the full `tesseract.exe` path).
-   - **macOS:** `brew install tesseract`
+## 🚀 Setup & Installation
 
-2. Install Python dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+### 1. Install Tesseract OCR Engine
+- **macOS (Homebrew):**
+  ```bash
+  brew install tesseract
+  ```
+- **Ubuntu / Debian:**
+  ```bash
+  sudo apt update && sudo apt install -y tesseract-ocr
+  ```
+- **Windows:**
+  Download and install the official installer from [UB-Mannheim Tesseract Wiki](https://github.com/UB-Mannheim/tesseract/wiki). Add `tesseract.exe` to your system PATH.
 
-3. (Optional, for the GUI) make sure Tkinter is available:
-   - Ubuntu/Debian: `sudo apt install python3-tk`
-   - Windows/macOS: bundled with standard Python installers already.
-
-## Usage
-
-**Single page (CLI):**
+### 2. Install Python Dependencies
+```bash
+pip install -r requirements.txt
 ```
+
+---
+
+## 💻 Usage
+
+### Launch Desktop GUI (Recommended for Viva / Demos)
+```bash
+python gui.py
+```
+*(Or `python3 gui.py`)*
+
+#### Quick Viva Demo Workflow:
+1. Click **"📁 Load Sample"** (loads `photo.jpg` or open any photo/use `📷 Live Camera`).
+2. Show the **"1. Boundary & Crop"** tab: Drag the corner points to demonstrate manual CamScanner-style corner refinement with the precision magnifying loupe!
+3. Click **"⚡ Scan Page"**: Observe the status bar and the instant switch to the **"2. Scanned Result"** tab.
+4. Toggle **"Side-by-Side (Original vs Scan)"** to show the before-and-after comparison.
+5. Click **"3. CV Pipeline Stages"**: Walk your professor through each of the 9 stages (Grayscale, Canny edges, Dilation, Homography, Background shadow model, Normalized signal, and CLAHE/Binarization) using the on-screen explanation cards.
+6. In the right panel, highlight the **OCR Confidence gauge**, search for words in the text box, and click **"📑 Export Searchable PDF"**!
+
+### CLI Usage
+
+**Single page scan:**
+```bash
 python main.py --input photo.jpg --output out/
 ```
 
-**Choose enhancement mode** (`bw` = classic scan look [default], `gray`, `color`):
-```
+**Choose enhancement mode (`bw`, `gray`, `color`):**
+```bash
 python main.py --input photo.jpg --output out/ --mode gray
 ```
 
-**Multi-page document → one combined searchable PDF:**
-```
+**Multi-page document → Combined searchable PDF:**
+```bash
 python main.py --input page1.jpg page2.jpg page3.jpg --output out/ --batch
 ```
 
-**Non-English text** (any Tesseract language pack you have installed, e.g. Hindi):
-```
+**Non-English language (e.g., Hindi or German if tessdata installed):**
+```bash
 python main.py --input photo.jpg --output out/ --lang eng+hin
 ```
 
-**GUI (for live demo/viva):**
-```
-python gui.py
-```
-Choose a photo → Scan Document → see the detected boundary + cleaned scan +
-extracted text side by side → Export PDF.
+---
 
-## Output files
+## 🎓 Viva Questions & Answers (Exam / Presentation Prep)
 
-| File | Description |
-|---|---|
-| `enhanced.png` | The cleaned, de-skewed, enhanced scan |
-| `debug_contour.png` | Original photo with the detected page outline drawn on it (good for a report screenshot) |
-| `text.txt` | Plain extracted text |
-| `document.pdf` | Searchable PDF — image with an invisible, selectable text layer |
+> **Q1: Why do you downscale the image during edge detection?**  
+> *A:* Downscaling (to height 700px) significantly speeds up Canny gradient computation and contours processing. It also acts as an implicit low-pass filter, smoothing away paper fiber micro-textures that would otherwise generate spurious edge noise. Once corners are located, they are scaled back to the original resolution by multiplying by `ratio`.
 
-## Design notes / things worth mentioning in your report or viva
+> **Q2: How does the 4-point perspective transform mathematically work?**  
+> *A:* Perspective projection is modeled by a $3 \times 3$ Homography matrix $M$ with 8 degrees of freedom:  
+> $\begin{bmatrix} x' \\ y' \\ 1 \end{bmatrix} \sim M \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}$  
+> Given 4 non-collinear point correspondences $(x_i, y_i) \leftrightarrow (x'_i, y'_i)$, OpenCV solves the linear system using `cv2.getPerspectiveTransform()` and maps the quad into a flat rectangular raster with `cv2.warpPerspective()`.
 
-- **Robust fallback:** if the contour-detection step can't find a clean
-  4-sided shape (e.g. the page already fills the whole frame), the pipeline
-  falls back to using the entire image, so it never crashes on an unusual
-  input — it degrades gracefully instead.
-- **Illumination correction** is done by estimating the lighting pattern with
-  a heavily blurred copy of the image and dividing it out (`enhance.py:
-  correct_illumination`) — this is a lightweight way to flatten uneven
-  lighting/shadows from a handheld camera shot without needing a reference
-  "blank page" scan.
-- **Two-stage deskew:** the perspective transform handles large tilt/rotation
-  from the camera angle; `fine_deskew` then corrects small residual rotation
-  (a couple of degrees) using `minAreaRect` on the thresholded text pixels.
-  Splitting it this way is more robust than trying to do it in one step.
-- **Searchable PDF, not "image + OCR text file":** the PDF is generated via
-  Tesseract's own PDF renderer (`image_to_pdf_or_hocr`), which keeps the
-  invisible text layer pixel-aligned under the image — this is what makes the
-  PDF properly searchable/selectable in a PDF reader, not just an image with
-  a text file next to it.
-- **OCR confidence score** is surfaced (`extract_text_with_confidence`) so the
-  app can flag low-quality scans back to the user instead of silently
-  returning garbage text.
+> **Q3: How does your illumination correction eliminate shadows without a blank reference sheet?**  
+> *A:* It uses a Gaussian blur background model with a large spatial variance ($\sigma = 25$). High-frequency text details are blurred away, leaving only the low-frequency ambient lighting and shadow field $B(x, y)$. Dividing the input image $I(x, y)$ by $B(x, y)$ normalizes the paper reflectance across the entire document.
 
-## Possible extensions (future work / stretch goals)
+> **Q4: What is the difference between a simple scanned image + text file and a Searchable PDF?**  
+> *A:* A searchable PDF embeds an invisible, pixel-aligned text layer directly beneath the document image (`pytesseract.image_to_pdf_or_hocr`). This allows users to search, highlight, and copy text directly in any PDF reader while preserving the authentic visual appearance of the scanned document.
 
-- Live webcam capture with real-time boundary overlay (OpenCV `VideoCapture`)
-- Auto-crop multiple documents from a single photo (e.g. a stack of receipts)
-- Language auto-detection before OCR
-- A lightweight web front-end (Flask/Streamlit) instead of/alongside the
-  Tkinter GUI, for easier demoing on a projector
-- Table/form structure detection (layout-aware OCR) for structured documents
+---
 
-## Testing note
-
-The pipeline was validated end-to-end on a synthetically generated "photographed
-page" (a flat page image warped with a perspective transform and placed on a
-shadowed background) to simulate a real camera photo — boundary detection,
-warp, deskew, and OCR all worked correctly (94.7% OCR confidence, exact text
-match). Test with a few of your own phone photos too, especially in varied
-lighting, before your final demo.
+## 📄 License
+MIT License. Created for Computer Vision & Document Intelligence coursework and research demonstrations.
